@@ -28,9 +28,7 @@ public class Product {
     private BigDecimal price;
     
     @Column(nullable = false)
-    private Integer quantity;
-    
-    private String category;
+    private Integer stock;
     
     @Column(name = "created_at")
     private Long createdAt;

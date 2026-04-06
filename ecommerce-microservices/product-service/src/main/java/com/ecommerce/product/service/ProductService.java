@@ -2,6 +2,7 @@ package com.ecommerce.product.service;
 
 import com.ecommerce.product.dto.ProductDTO;
 import com.ecommerce.product.entity.Product;
+import com.ecommerce.product.exception.ResourceNotFoundException;
 import com.ecommerce.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +26,7 @@ public class ProductService {
         product.setName(dto.getName());
         product.setDescription(dto.getDescription());
         product.setPrice(dto.getPrice());
-        product.setQuantity(dto.getQuantity());
-        product.setCategory(dto.getCategory());
+        product.setStock(dto.getStock());
         
         Product savedProduct = productRepository.save(product);
         log.info("Product created with ID: {}", savedProduct.getId());
@@ -36,21 +36,13 @@ public class ProductService {
     public ProductDTO getProductById(Long id) {
         log.info("Fetching product with ID: {}", id);
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
         return mapToDTO(product);
     }
     
     public List<ProductDTO> getAllProducts() {
         log.info("Fetching all products");
         return productRepository.findAll()
-                .stream()
-                .map(this::mapToDTO)
-                .collect(Collectors.toList());
-    }
-    
-    public List<ProductDTO> getProductsByCategory(String category) {
-        log.info("Fetching products by category: {}", category);
-        return productRepository.findByCategory(category)
                 .stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
@@ -67,13 +59,12 @@ public class ProductService {
     public ProductDTO updateProduct(Long id, ProductDTO dto) {
         log.info("Updating product with ID: {}", id);
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
         
         product.setName(dto.getName());
         product.setDescription(dto.getDescription());
         product.setPrice(dto.getPrice());
-        product.setQuantity(dto.getQuantity());
-        product.setCategory(dto.getCategory());
+        product.setStock(dto.getStock());
         
         Product updatedProduct = productRepository.save(product);
         log.info("Product updated with ID: {}", updatedProduct.getId());
@@ -83,7 +74,7 @@ public class ProductService {
     public void deleteProduct(Long id) {
         log.info("Deleting product with ID: {}", id);
         if (!productRepository.existsById(id)) {
-            throw new RuntimeException("Product not found with ID: " + id);
+            throw new ResourceNotFoundException("Product not found with ID: " + id);
         }
         productRepository.deleteById(id);
         log.info("Product deleted with ID: {}", id);
@@ -95,8 +86,7 @@ public class ProductService {
                 product.getName(),
                 product.getDescription(),
                 product.getPrice(),
-                product.getQuantity(),
-                product.getCategory(),
+                product.getStock(),
                 product.getCreatedAt(),
                 product.getUpdatedAt()
         );
