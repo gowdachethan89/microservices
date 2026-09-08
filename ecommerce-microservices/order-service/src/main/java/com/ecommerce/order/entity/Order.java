@@ -31,6 +31,8 @@ public class Order {
     @Column(nullable = false)
     private BigDecimal totalAmount;
     
+    private String paymentMethod;
+
     private Long paymentId;
     
     private String paymentStatus; // PENDING, COMPLETED, FAILED

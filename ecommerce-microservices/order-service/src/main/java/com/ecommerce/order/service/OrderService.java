@@ -60,6 +60,7 @@ public class OrderService {
         order.setProductId(dto.getProductId());
         order.setQuantity(dto.getQuantity());
         order.setTotalAmount(dto.getTotalAmount());
+        order.setPaymentMethod(dto.getPaymentMethod());
 
         Order savedOrder = orderRepository.save(order);
         log.info("Order created with ID: {}", savedOrder.getId());
@@ -68,7 +69,7 @@ public class OrderService {
         com.ecommerce.order.client.dto.PaymentDTO paymentRequest = new com.ecommerce.order.client.dto.PaymentDTO();
         paymentRequest.setOrderId(savedOrder.getId());
         paymentRequest.setAmount(savedOrder.getTotalAmount());
-        paymentRequest.setPaymentMethod("CARD"); // default - in real system comes from client
+        paymentRequest.setPaymentMethod(dto.getPaymentMethod() != null ? dto.getPaymentMethod() : "CARD"); // prefer client-provided method
 
         com.ecommerce.order.client.dto.PaymentDTO paymentResponse;
         try {
@@ -167,6 +168,7 @@ public class OrderService {
                 order.getQuantity(),
                 order.getStatus(),
                 order.getTotalAmount(),
+                order.getPaymentMethod(),
                 order.getPaymentId(),
                 order.getPaymentStatus(),
                 order.getCreatedAt(),
