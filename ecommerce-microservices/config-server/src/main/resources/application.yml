@@ -9,6 +9,10 @@ spring:
   profiles:
     active: native
 
+eureka:
+  instance:
+    instance-id: ${spring.application.name}:${server.port}.
+
 server:
   port: 8888
 
