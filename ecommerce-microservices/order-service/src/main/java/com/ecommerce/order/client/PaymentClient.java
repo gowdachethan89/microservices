@@ -9,6 +9,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 public interface PaymentClient {
 
     @PostMapping
-    PaymentDTO processPayment(@RequestBody PaymentDTO payment);
+    PaymentDTO processPayment(@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey, @RequestBody PaymentDTO payment);
+
+    @PostMapping("/{id}/refund")
+    PaymentDTO refundPayment(@PathVariable("id") Long id, @RequestParam("reason") String reason);
 
 }

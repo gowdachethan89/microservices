@@ -1,0 +1,6 @@
+com\ecommerce\order\client\dto\ProductDTO.class
+com\ecommerce\order\client\ProductClient.class
+com\ecommerce\order\client\CustomerClient.class
+com\ecommerce\order\client\dto\CustomerDTO.class
+com\ecommerce\order\client\PaymentClient.class
+com\ecommerce\order\client\dto\PaymentDTO.class

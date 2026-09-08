@@ -60,6 +60,23 @@ public class ProductController {
         return ResponseEntity.ok(updated);
     }
     
+    @PostMapping("/{id}/reserve")
+    public ResponseEntity<Void> reserveStock(@PathVariable Long id, @RequestBody java.util.Map<String, Integer> body) {
+        Integer quantity = body.getOrDefault("quantity", 0);
+        boolean reserved = productService.reserveStock(id, quantity);
+        if (!reserved) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/release")
+    public ResponseEntity<Void> releaseStock(@PathVariable Long id, @RequestBody java.util.Map<String, Integer> body) {
+        Integer quantity = body.getOrDefault("quantity", 0);
+        productService.releaseStock(id, quantity);
+        return ResponseEntity.ok().build();
+    }
+    
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
         log.info("DELETE request for product with ID: {}", id);

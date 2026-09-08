@@ -17,8 +17,9 @@ public class PaymentController {
     private final PaymentService paymentService;
     
     @PostMapping
-    public ResponseEntity<PaymentDTO> processPayment(@RequestBody PaymentDTO dto) {
-        PaymentDTO payment = paymentService.processPayment(dto);
+    public ResponseEntity<PaymentDTO> processPayment(@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+                                                     @RequestBody PaymentDTO dto) {
+        PaymentDTO payment = paymentService.processPayment(dto, idempotencyKey);
         return ResponseEntity.status(HttpStatus.CREATED).body(payment);
     }
     

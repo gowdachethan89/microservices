@@ -11,4 +11,10 @@ public interface ProductClient {
     @GetMapping("/{id}")
     ProductDTO getProduct(@PathVariable("id") Long id);
 
+    @PostMapping("/{id}/reserve")
+    void reserveStock(@PathVariable("id") Long id, @RequestBody java.util.Map<String, Integer> body);
+
+    @PostMapping("/{id}/release")
+    void releaseStock(@PathVariable("id") Long id, @RequestBody java.util.Map<String, Integer> body);
+
 }

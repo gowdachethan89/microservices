@@ -19,13 +19,29 @@ public class PaymentService {
     
     private final PaymentRepository paymentRepository;
     
-    public PaymentDTO processPayment(PaymentDTO dto) {
-        log.info("Processing payment for order: {}", dto.getOrderId());
-        Payment payment = new Payment();
+    // Support idempotent processing by idempotencyKey and by orderId
+    public PaymentDTO processPayment(PaymentDTO dto, String idempotencyKey) {
+        log.info("Processing payment for order: {} (idempotencyKey={})", dto.getOrderId(), idempotencyKey);
+        // If idempotency key provided, return existing if present
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            var existing = paymentRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                log.info("Returning existing payment for idempotencyKey={}", idempotencyKey);
+                return mapToDTO(existing.get());
+            }
+        }
+        // If a payment already exists for this orderId, return it (protect against duplicates)
+        var byOrder = paymentRepository.findByOrderId(dto.getOrderId());
+        if (byOrder.isPresent()) {
+            log.info("Existing payment found for orderId={}", dto.getOrderId());
+            return mapToDTO(byOrder.get());
+        }
+n        Payment payment = new Payment();
         payment.setOrderId(dto.getOrderId());
         payment.setAmount(dto.getAmount());
         payment.setPaymentMethod(dto.getPaymentMethod());
         payment.setTransactionId(generateTransactionId());
+        payment.setIdempotencyKey(idempotencyKey);
         
         // Simulate payment processing
         boolean paymentSuccess = simulatePaymentProcessing();

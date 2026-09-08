@@ -1,0 +1,12 @@
+C:\workspace\git projects\microservices\ecommerce-microservices\order-service\src\main\java\com\ecommerce\order\client\CustomerClient.java
+C:\workspace\git projects\microservices\ecommerce-microservices\order-service\src\main\java\com\ecommerce\order\client\dto\CustomerDTO.java
+C:\workspace\git projects\microservices\ecommerce-microservices\order-service\src\main\java\com\ecommerce\order\client\dto\PaymentDTO.java
+C:\workspace\git projects\microservices\ecommerce-microservices\order-service\src\main\java\com\ecommerce\order\client\dto\ProductDTO.java
+C:\workspace\git projects\microservices\ecommerce-microservices\order-service\src\main\java\com\ecommerce\order\client\PaymentClient.java
+C:\workspace\git projects\microservices\ecommerce-microservices\order-service\src\main\java\com\ecommerce\order\client\ProductClient.java
+C:\workspace\git projects\microservices\ecommerce-microservices\order-service\src\main\java\com\ecommerce\order\controller\OrderController.java
+C:\workspace\git projects\microservices\ecommerce-microservices\order-service\src\main\java\com\ecommerce\order\dto\OrderDTO.java
+C:\workspace\git projects\microservices\ecommerce-microservices\order-service\src\main\java\com\ecommerce\order\entity\Order.java
+C:\workspace\git projects\microservices\ecommerce-microservices\order-service\src\main\java\com\ecommerce\order\OrderServiceApplication.java
+C:\workspace\git projects\microservices\ecommerce-microservices\order-service\src\main\java\com\ecommerce\order\repository\OrderRepository.java
+C:\workspace\git projects\microservices\ecommerce-microservices\order-service\src\main\java\com\ecommerce\order\service\OrderService.java

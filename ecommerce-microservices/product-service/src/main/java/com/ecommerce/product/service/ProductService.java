@@ -33,6 +33,21 @@ public class ProductService {
         log.info("Product created with ID: {}", savedProduct.getId());
         return mapToDTO(savedProduct);
     }
+
+    // Reserve stock atomically: returns true if reserved (stock decremented), false if insufficient stock
+    @org.springframework.transaction.annotation.Transactional
+    public boolean reserveStock(Long productId, Integer quantity) {
+        log.info("Reserving {} units for product: {}", quantity, productId);
+        int updated = productRepository.decrementStockIfAvailable(productId, quantity);
+        return updated > 0;
+    }
+
+    // Release previously reserved stock (increment)
+    @org.springframework.transaction.annotation.Transactional
+    public void releaseStock(Long productId, Integer quantity) {
+        log.info("Releasing {} units for product: {}", quantity, productId);
+        productRepository.incrementStock(productId, quantity);
+    }
     
     public ProductDTO getProductById(Long id) {
         log.info("Fetching product with ID: {}", id);

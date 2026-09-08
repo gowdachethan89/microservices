@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: config-server
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/config
+  profiles:
+    active: native
+
+eureka:
+  instance:
+    instance-id: ${spring.application.name}:${server.port}.
+
+server:
+  port: 8888
+
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud: DEBUG
+

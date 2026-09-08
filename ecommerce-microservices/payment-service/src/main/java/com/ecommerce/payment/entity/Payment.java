@@ -34,6 +34,9 @@ public class Payment {
     
     private String failureReason;
     
+    // Optional idempotency key supplied by callers to avoid duplicate processing
+    private String idempotencyKey;
+    
     @Column(name = "created_at")
     private Long createdAt;
     

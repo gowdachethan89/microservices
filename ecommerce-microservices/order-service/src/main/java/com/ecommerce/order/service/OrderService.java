@@ -53,7 +53,7 @@ public class OrderService {
             throw new RuntimeException("Customer validation failed: " + ex.getMessage());
         }
 
-        // 2. Validate product and stock
+        // 2. Validate product and stock, then attempt reservation
         ProductDTO product;
         try {
             product = productClient.getProduct(dto.getProductId());
@@ -65,6 +65,13 @@ public class OrderService {
             }
             if (product.getStock() == null || product.getStock() < dto.getQuantity()) {
                 throw new RuntimeException("Insufficient stock for product: " + dto.getProductId());
+            }
+            // Try to reserve atomically. ProductService does an atomic decrement; if it fails it will return 409 which Feign will surface as exception
+            try {
+                productClient.reserveStock(dto.getProductId(), java.util.Collections.singletonMap("quantity", dto.getQuantity()));
+            } catch (Exception rex) {
+                log.error("Stock reservation failed for product {} qty {}: {}", dto.getProductId(), dto.getQuantity(), rex.getMessage());
+                throw new RuntimeException("Insufficient stock or reservation failed: " + rex.getMessage());
             }
         } catch (Exception ex) {
             log.error("Product validation failed: {}", ex.getMessage());
@@ -78,11 +85,9 @@ public class OrderService {
         order.setQuantity(dto.getQuantity());
         order.setTotalAmount(dto.getTotalAmount());
         order.setPaymentMethod(dto.getPaymentMethod());
-
-        Order savedOrder = orderRepository.save(order);
+n        Order savedOrder = orderRepository.save(order);
         log.info("Order created with ID: {}", savedOrder.getId());
-
-        // 4. Process payment
+n        // 4. Process payment
         PaymentDTO paymentRequest = new PaymentDTO();
         paymentRequest.setOrderId(savedOrder.getId());
         paymentRequest.setAmount(savedOrder.getTotalAmount());
@@ -90,16 +95,23 @@ public class OrderService {
 
         PaymentDTO paymentResponse;
         try {
-            paymentResponse = paymentClient.processPayment(paymentRequest);
+            // use an idempotency key derived from the order id to protect against duplicate charges
+            String idempotencyKey = "order-" + savedOrder.getId();
+            paymentResponse = paymentClient.processPayment(idempotencyKey, paymentRequest);
         } catch (Exception ex) {
             log.error("Payment service call failed: {}", ex.getMessage());
-            // mark order payment as FAILED
+            // mark order payment as FAILED and release reserved stock
             savedOrder.setPaymentStatus("FAILED");
+            savedOrder.setStatus("CANCELLED");
             orderRepository.save(savedOrder);
+            try {
+                productClient.releaseStock(dto.getProductId(), java.util.Collections.singletonMap("quantity", dto.getQuantity()));
+            } catch (Exception rex) {
+                log.error("Failed to release stock after payment failure for order {}: {}", savedOrder.getId(), rex.getMessage());
+            }
             throw new RuntimeException("Payment processing failed: " + ex.getMessage());
         }
-
-        // 5. Update order with payment info
+n        // 5. Update order with payment info and finalize; if final save fails attempt compensation (refund + release)
         savedOrder.setPaymentId(paymentResponse.getId());
         savedOrder.setPaymentStatus(paymentResponse.getStatus());
         if ("COMPLETED".equals(paymentResponse.getStatus())) {
@@ -108,8 +120,27 @@ public class OrderService {
             savedOrder.setStatus("CANCELLED");
         }
 
-        Order updatedOrder = orderRepository.save(savedOrder);
-        log.info("Order {} updated with payment status: {}", updatedOrder.getId(), updatedOrder.getPaymentStatus());
+        Order updatedOrder;
+        try {
+            updatedOrder = orderRepository.save(savedOrder);
+            log.info("Order {} updated with payment status: {}", updatedOrder.getId(), updatedOrder.getPaymentStatus());
+        } catch (Exception ex) {
+            log.error("Failed to persist order update after payment for order {}: {}", savedOrder.getId(), ex.getMessage());
+            // compensate: if payment completed -> refund, and always release stock
+            try {
+                if (paymentResponse != null && "COMPLETED".equals(paymentResponse.getStatus())) {
+                    try {
+                        paymentClient.refundPayment(paymentResponse.getId(), "Order update failed");
+                    } catch (Exception refundEx) {
+                        log.error("Failed to refund payment {} after order persistence failure: {}", paymentResponse.getId(), refundEx.getMessage());
+                    }
+                }
+                productClient.releaseStock(dto.getProductId(), java.util.Collections.singletonMap("quantity", dto.getQuantity()));
+            } catch (Exception compEx) {
+                log.error("Compensation failed for order {}: {}", savedOrder.getId(), compEx.getMessage());
+            }
+            throw new RuntimeException("Failed to finalize order after payment: " + ex.getMessage());
+        }
 
         return mapToDTO(updatedOrder);
     }
