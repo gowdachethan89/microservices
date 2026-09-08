@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 
 @Data
@@ -14,7 +15,10 @@ public class ProductDTO {
     private String name;
     private String description;
     private BigDecimal price;
+
+    @JsonProperty("quantity")
     private Integer stock;
+
     private Long createdAt;
     private Long updatedAt;
 }
