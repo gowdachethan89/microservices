@@ -26,6 +26,7 @@ public class ProductService {
         product.setName(dto.getName());
         product.setDescription(dto.getDescription());
         product.setPrice(dto.getPrice());
+        product.setCategory(dto.getCategory());
         product.setStock(dto.getStock());
         
         Product savedProduct = productRepository.save(product);
@@ -55,6 +56,14 @@ public class ProductService {
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
+
+    public List<ProductDTO> getProductsByCategory(String category) {
+        log.info("Fetching products in category: {}", category);
+        return productRepository.findByCategoryIgnoreCase(category)
+                .stream()
+                .map(this::mapToDTO)
+                .collect(Collectors.toList());
+    }
     
     public ProductDTO updateProduct(Long id, ProductDTO dto) {
         log.info("Updating product with ID: {}", id);
@@ -64,6 +73,7 @@ public class ProductService {
         product.setName(dto.getName());
         product.setDescription(dto.getDescription());
         product.setPrice(dto.getPrice());
+        product.setCategory(dto.getCategory());
         product.setStock(dto.getStock());
         
         Product updatedProduct = productRepository.save(product);
@@ -86,6 +96,7 @@ public class ProductService {
                 product.getName(),
                 product.getDescription(),
                 product.getPrice(),
+                product.getCategory(),
                 product.getStock(),
                 product.getCreatedAt(),
                 product.getUpdatedAt()

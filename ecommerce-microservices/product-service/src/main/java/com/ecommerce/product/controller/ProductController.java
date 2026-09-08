@@ -45,6 +45,13 @@ public class ProductController {
         List<ProductDTO> products = productService.searchProducts(query);
         return ResponseEntity.ok(products);
     }
+
+    @GetMapping("/category/{category}")
+    public ResponseEntity<List<ProductDTO>> getProductsByCategory(@PathVariable String category) {
+        log.info("GET request for products in category: {}", category);
+        List<ProductDTO> products = productService.getProductsByCategory(category);
+        return ResponseEntity.ok(products);
+    }
     
     @PutMapping("/{id}")
     public ResponseEntity<ProductDTO> updateProduct(@PathVariable Long id, @RequestBody ProductDTO dto) {
