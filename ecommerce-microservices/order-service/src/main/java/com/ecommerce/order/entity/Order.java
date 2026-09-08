@@ -20,6 +20,10 @@ public class Order {
     
     @Column(nullable = false)
     private Long customerId;
+
+    private Long productId;
+
+    private Integer quantity;
     
     @Column(nullable = false)
     private String status; // PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED

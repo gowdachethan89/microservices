@@ -1,4 +1,4 @@
-package com.ecommerce.order.dto;
+package com.ecommerce.order.client.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -9,16 +9,14 @@ import java.math.BigDecimal;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderDTO {
+public class PaymentDTO {
     private Long id;
-    private Long customerId;
-    private Long productId;
-    private Integer quantity;
+    private Long orderId;
+    private BigDecimal amount;
     private String status;
-    private BigDecimal totalAmount;
-    private Long paymentId;
-    private String paymentStatus;
+    private String paymentMethod;
+    private String transactionId;
+    private String failureReason;
     private Long createdAt;
     private Long updatedAt;
 }
-
