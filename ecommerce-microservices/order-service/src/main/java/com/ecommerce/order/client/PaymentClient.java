@@ -2,8 +2,7 @@ package com.ecommerce.order.client;
 
 import com.ecommerce.order.client.dto.PaymentDTO;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.*;
 
 @FeignClient(name = "payment-service", url = "${payment.service.url}", path = "/api/payments")
 public interface PaymentClient {

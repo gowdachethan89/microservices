@@ -85,9 +85,11 @@ public class OrderService {
         order.setQuantity(dto.getQuantity());
         order.setTotalAmount(dto.getTotalAmount());
         order.setPaymentMethod(dto.getPaymentMethod());
-n        Order savedOrder = orderRepository.save(order);
+
+        Order savedOrder = orderRepository.save(order);
         log.info("Order created with ID: {}", savedOrder.getId());
-n        // 4. Process payment
+
+        // 4. Process payment
         PaymentDTO paymentRequest = new PaymentDTO();
         paymentRequest.setOrderId(savedOrder.getId());
         paymentRequest.setAmount(savedOrder.getTotalAmount());
@@ -111,7 +113,8 @@ public class OrderService {
             }
             throw new RuntimeException("Payment processing failed: " + ex.getMessage());
         }
-n        // 5. Update order with payment info and finalize; if final save fails attempt compensation (refund + release)
+
+        // 5. Update order with payment info and finalize; if final save fails attempt compensation (refund + release)
         savedOrder.setPaymentId(paymentResponse.getId());
         savedOrder.setPaymentStatus(paymentResponse.getStatus());
         if ("COMPLETED".equals(paymentResponse.getStatus())) {
