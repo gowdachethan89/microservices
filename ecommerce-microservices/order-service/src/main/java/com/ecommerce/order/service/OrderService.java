@@ -1,5 +1,11 @@
 package com.ecommerce.order.service;
 
+import com.ecommerce.order.client.CustomerClient;
+import com.ecommerce.order.client.PaymentClient;
+import com.ecommerce.order.client.ProductClient;
+import com.ecommerce.order.client.dto.CustomerDTO;
+import com.ecommerce.order.client.dto.PaymentDTO;
+import com.ecommerce.order.client.dto.ProductDTO;
 import com.ecommerce.order.dto.OrderDTO;
 import com.ecommerce.order.entity.Order;
 import com.ecommerce.order.repository.OrderRepository;
@@ -18,16 +24,27 @@ import java.util.stream.Collectors;
 public class OrderService {
     
     private final OrderRepository orderRepository;
-    private final com.ecommerce.order.client.CustomerClient customerClient;
-    private final com.ecommerce.order.client.ProductClient productClient;
-    private final com.ecommerce.order.client.PaymentClient paymentClient;
+    private final CustomerClient customerClient;
+    private final ProductClient productClient;
+    private final PaymentClient paymentClient;
 
     public OrderDTO createOrder(OrderDTO dto) {
         log.info("Creating order for customer: {} and product: {}", dto.getCustomerId(), dto.getProductId());
 
+        // Basic validation for incoming request to avoid calling downstream services with nulls
+        if (dto.getCustomerId() == null) {
+            throw new RuntimeException("Customer id is required");
+        }
+        if (dto.getProductId() == null) {
+            throw new RuntimeException("Product id is required");
+        }
+        if (dto.getQuantity() == null || dto.getQuantity() <= 0) {
+            throw new RuntimeException("Quantity is required and must be > 0");
+        }
+
         // 1. Validate customer
         try {
-            com.ecommerce.order.client.dto.CustomerDTO customer = customerClient.getCustomer(dto.getCustomerId());
+            CustomerDTO customer = customerClient.getCustomer(dto.getCustomerId());
             if (customer == null || customer.getId() == null) {
                 throw new RuntimeException("Customer validation failed for id: " + dto.getCustomerId());
             }
@@ -37,7 +54,7 @@ public class OrderService {
         }
 
         // 2. Validate product and stock
-        com.ecommerce.order.client.dto.ProductDTO product;
+        ProductDTO product;
         try {
             product = productClient.getProduct(dto.getProductId());
             if (product == null || product.getId() == null) {
@@ -66,12 +83,12 @@ public class OrderService {
         log.info("Order created with ID: {}", savedOrder.getId());
 
         // 4. Process payment
-        com.ecommerce.order.client.dto.PaymentDTO paymentRequest = new com.ecommerce.order.client.dto.PaymentDTO();
+        PaymentDTO paymentRequest = new PaymentDTO();
         paymentRequest.setOrderId(savedOrder.getId());
         paymentRequest.setAmount(savedOrder.getTotalAmount());
         paymentRequest.setPaymentMethod(dto.getPaymentMethod() != null ? dto.getPaymentMethod() : "CARD"); // prefer client-provided method
 
-        com.ecommerce.order.client.dto.PaymentDTO paymentResponse;
+        PaymentDTO paymentResponse;
         try {
             paymentResponse = paymentClient.processPayment(paymentRequest);
         } catch (Exception ex) {
