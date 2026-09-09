@@ -1,5 +1,6 @@
 package com.ecommerce.customer.service;
 
+import com.ecommerce.customer.ResourceNotFoundException;
 import com.ecommerce.customer.dto.CustomerDTO;
 import com.ecommerce.customer.entity.Customer;
 import com.ecommerce.customer.repository.CustomerRepository;
@@ -35,7 +36,7 @@ public class CustomerService {
     public CustomerDTO getCustomerById(Long id) {
         log.info("Fetching customer with ID: {}", id);
         Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Customer not found with ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found with ID: " + id));
         return mapToDTO(customer);
     }
     
@@ -50,7 +51,7 @@ public class CustomerService {
     public CustomerDTO updateCustomer(Long id, CustomerDTO dto) {
         log.info("Updating customer with ID: {}", id);
         Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Customer not found with ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found with ID: " + id));
         
         customer.setEmail(dto.getEmail());
         customer.setFirstName(dto.getFirstName());
@@ -65,7 +66,7 @@ public class CustomerService {
     public void deleteCustomer(Long id) {
         log.info("Deleting customer with ID: {}", id);
         if (!customerRepository.existsById(id)) {
-            throw new RuntimeException("Customer not found with ID: " + id);
+            throw new ResourceNotFoundException("Customer not found with ID: " + id);
         }
         customerRepository.deleteById(id);
         log.info("Customer deleted with ID: {}", id);

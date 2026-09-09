@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/products")
@@ -30,6 +31,13 @@ public class ProductController {
         log.info("GET request for product with ID: {}", id);
         ProductDTO product = productService.getProductById(id);
         return ResponseEntity.ok(product);
+    }
+
+    @GetMapping("/{id}/inventory")
+    public ResponseEntity<Map<String, Object>> getInventory(@PathVariable Long id) {
+        log.info("GET inventory for product ID: {}", id);
+        Map<String, Object> inv = productService.getInventory(id);
+        return ResponseEntity.ok(inv);
     }
     
     @GetMapping
@@ -60,21 +68,28 @@ public class ProductController {
         return ResponseEntity.ok(updated);
     }
     
-    @PostMapping("/{id}/reserve")
-    public ResponseEntity<Void> reserveStock(@PathVariable Long id, @RequestBody java.util.Map<String, Integer> body) {
-        Integer quantity = body.getOrDefault("quantity", 0);
-        boolean reserved = productService.reserveStock(id, quantity);
+    @PutMapping("/{id}/inventory/reserve")
+    public ResponseEntity<Map<String, Object>> reserveInventory(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Integer quantity = body.get("quantity") == null ? 0 : ((Number) body.get("quantity")).intValue();
+        String orderId = body.get("orderId") == null ? null : String.valueOf(body.get("orderId"));
+        String reason = body.get("reason") == null ? null : String.valueOf(body.get("reason"));
+        boolean reserved = productService.reserveInventory(id, quantity, orderId, reason);
         if (!reserved) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "INSUFFICIENT_STOCK"));
         }
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(Map.of("status", "RESERVED"));
     }
 
-    @PostMapping("/{id}/release")
-    public ResponseEntity<Void> releaseStock(@PathVariable Long id, @RequestBody java.util.Map<String, Integer> body) {
-        Integer quantity = body.getOrDefault("quantity", 0);
-        productService.releaseStock(id, quantity);
-        return ResponseEntity.ok().build();
+    @PutMapping("/{id}/inventory/release")
+    public ResponseEntity<Map<String, Object>> releaseInventory(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Integer quantity = body.get("quantity") == null ? 0 : ((Number) body.get("quantity")).intValue();
+        String orderId = body.get("orderId") == null ? null : String.valueOf(body.get("orderId"));
+        String reason = body.get("reason") == null ? null : String.valueOf(body.get("reason"));
+        boolean released = productService.releaseInventory(id, quantity, orderId, reason);
+        if (!released) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "RELEASE_FAILED"));
+        }
+        return ResponseEntity.ok(Map.of("status", "RELEASED"));
     }
     
     @DeleteMapping("/{id}")

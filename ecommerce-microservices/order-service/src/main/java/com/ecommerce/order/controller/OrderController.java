@@ -1,6 +1,7 @@
 package com.ecommerce.order.controller;
 
 import com.ecommerce.order.dto.OrderDTO;
+import com.ecommerce.order.dto.OrderRequest;
 import com.ecommerce.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,8 +18,8 @@ public class OrderController {
     private final OrderService orderService;
     
     @PostMapping
-    public ResponseEntity<OrderDTO> createOrder(@RequestBody OrderDTO dto) {
-        OrderDTO created = orderService.createOrder(dto);
+    public ResponseEntity<OrderDTO> createOrder(@RequestBody OrderRequest request) {
+        OrderDTO created = orderService.createOrder(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
     

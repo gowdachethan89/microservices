@@ -9,7 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,26 +29,29 @@ public class ProductService {
         product.setDescription(dto.getDescription());
         product.setPrice(dto.getPrice());
         product.setCategory(dto.getCategory());
-        product.setStock(dto.getStock());
+        product.setQuantity(dto.getQuantity() != null ? dto.getQuantity() : 0);
+        product.setReserved(dto.getReserved() != null ? dto.getReserved() : 0);
+        product.setAvailable(product.getQuantity() - product.getReserved());
         
         Product savedProduct = productRepository.save(product);
         log.info("Product created with ID: {}", savedProduct.getId());
         return mapToDTO(savedProduct);
     }
 
-    // Reserve stock atomically: returns true if reserved (stock decremented), false if insufficient stock
-    @org.springframework.transaction.annotation.Transactional
-    public boolean reserveStock(Long productId, Integer quantity) {
-        log.info("Reserving {} units for product: {}", quantity, productId);
-        int updated = productRepository.decrementStockIfAvailable(productId, quantity);
+    // Reserve inventory atomically: returns true if reserved, false if insufficient
+    @Transactional
+    public boolean reserveInventory(Long productId, Integer quantity, String orderId, String reason) {
+        log.info("Reserving {} units for product: {} (order={} reason={})", quantity, productId, orderId, reason);
+        int updated = productRepository.reserveInventoryIfAvailable(productId, quantity);
         return updated > 0;
     }
 
-    // Release previously reserved stock (increment)
-    @org.springframework.transaction.annotation.Transactional
-    public void releaseStock(Long productId, Integer quantity) {
-        log.info("Releasing {} units for product: {}", quantity, productId);
-        productRepository.incrementStock(productId, quantity);
+    // Release reserved inventory (compensation)
+    @Transactional
+    public boolean releaseInventory(Long productId, Integer quantity, String orderId, String reason) {
+        log.info("Releasing {} reserved units for product: {} (order={} reason={})", quantity, productId, orderId, reason);
+        int updated = productRepository.releaseReservedInventory(productId, quantity);
+        return updated > 0;
     }
     
     public ProductDTO getProductById(Long id) {
@@ -54,6 +59,18 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
         return mapToDTO(product);
+    }
+    
+    public Map<String, Object> getInventory(Long id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
+        Map<String, Object> inv = new HashMap<>();
+        inv.put("productId", product.getId());
+        inv.put("quantity", product.getQuantity());
+        inv.put("reserved", product.getReserved());
+        inv.put("available", product.getAvailable());
+        inv.put("status", product.getAvailable() > 0 ? "IN_STOCK" : "OUT_OF_STOCK");
+        return inv;
     }
     
     public List<ProductDTO> getAllProducts() {
@@ -89,7 +106,9 @@ public class ProductService {
         product.setDescription(dto.getDescription());
         product.setPrice(dto.getPrice());
         product.setCategory(dto.getCategory());
-        product.setStock(dto.getStock());
+        product.setQuantity(dto.getQuantity() != null ? dto.getQuantity() : product.getQuantity());
+        product.setReserved(dto.getReserved() != null ? dto.getReserved() : product.getReserved());
+        product.setAvailable(product.getQuantity() - product.getReserved());
         
         Product updatedProduct = productRepository.save(product);
         log.info("Product updated with ID: {}", updatedProduct.getId());
@@ -112,7 +131,9 @@ public class ProductService {
                 product.getDescription(),
                 product.getPrice(),
                 product.getCategory(),
-                product.getStock(),
+                product.getQuantity(),
+                product.getReserved(),
+                product.getAvailable(),
                 product.getCreatedAt(),
                 product.getUpdatedAt()
         );

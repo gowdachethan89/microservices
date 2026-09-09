@@ -29,8 +29,17 @@ public class Product {
 
     private String category;
 
+    // total quantity in stock
     @Column(nullable = false)
-    private Integer stock;
+    private Integer quantity = 0;
+
+    // units currently reserved for orders
+    @Column(nullable = false)
+    private Integer reserved = 0;
+
+    // available = quantity - reserved
+    @Column(nullable = false)
+    private Integer available = 0;
 
     @Column(name = "created_at")
     private Long createdAt;
@@ -40,14 +49,19 @@ public class Product {
     
     @PrePersist
     public void prePersist() {
+        if (this.quantity == null) this.quantity = 0;
+        if (this.reserved == null) this.reserved = 0;
+        this.available = this.quantity - this.reserved;
         this.createdAt = System.currentTimeMillis();
         this.updatedAt = System.currentTimeMillis();
     }
     
     @PreUpdate
     public void preUpdate() {
+        if (this.quantity == null) this.quantity = 0;
+        if (this.reserved == null) this.reserved = 0;
+        this.available = this.quantity - this.reserved;
         this.updatedAt = System.currentTimeMillis();
     }
     
 }
-

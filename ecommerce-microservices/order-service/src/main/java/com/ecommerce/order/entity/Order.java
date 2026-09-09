@@ -6,6 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "orders")
@@ -21,18 +23,16 @@ public class Order {
     @Column(nullable = false)
     private Long customerId;
 
-    private Long productId;
-
-    private Integer quantity;
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderItem> items = new ArrayList<>();
     
     @Column(nullable = false)
-    private String status; // PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED
+    private String status; // PENDING, CONFIRMED, FAILED, CANCELLED
     
-    @Column(nullable = false)
+    private BigDecimal subtotal;
+    private BigDecimal tax;
     private BigDecimal totalAmount;
     
-    private String paymentMethod;
-
     private Long paymentId;
     
     private String paymentStatus; // PENDING, COMPLETED, FAILED
@@ -47,7 +47,7 @@ public class Order {
     public void prePersist() {
         this.createdAt = System.currentTimeMillis();
         this.updatedAt = System.currentTimeMillis();
-        this.status = "PENDING";
+        if (this.status == null) this.status = "PENDING";
     }
     
     @PreUpdate
@@ -55,5 +55,9 @@ public class Order {
         this.updatedAt = System.currentTimeMillis();
     }
     
+    public void addItem(OrderItem item) {
+        item.setOrder(this);
+        this.items.add(item);
+    }
 }
 

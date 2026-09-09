@@ -7,7 +7,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -17,10 +19,30 @@ public class PaymentController {
     private final PaymentService paymentService;
     
     @PostMapping
-    public ResponseEntity<PaymentDTO> processPayment(@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
-                                                     @RequestBody PaymentDTO dto) {
+    public ResponseEntity<Object> processPayment(@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+                                                 @RequestBody PaymentDTO dto) {
         PaymentDTO payment = paymentService.processPayment(dto, idempotencyKey);
-        return ResponseEntity.status(HttpStatus.CREATED).body(payment);
+        if (payment == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+        if ("COMPLETED".equals(payment.getStatus())) {
+            Map<String, Object> body = Map.of(
+                    "paymentId", payment.getId(),
+                    "orderId", payment.getOrderId(),
+                    "amount", payment.getAmount(),
+                    "status", "COMPLETED",
+                    "transactionId", payment.getTransactionId()
+            );
+            return ResponseEntity.ok(body);
+        } else {
+            Map<String, Object> err = Map.of(
+                    "paymentId", payment.getId(),
+                    "status", "FAILED",
+                    "error", "CARD_DECLINED",
+                    "message", payment.getFailureReason() != null ? payment.getFailureReason() : "Payment failed"
+            );
+            return ResponseEntity.status(402).body(err);
+        }
     }
     
     @GetMapping("/{id}")
@@ -48,9 +70,21 @@ public class PaymentController {
     }
     
     @PostMapping("/{id}/refund")
-    public ResponseEntity<PaymentDTO> refundPayment(@PathVariable Long id, @RequestParam String reason) {
-        PaymentDTO payment = paymentService.refundPayment(id, reason);
-        return ResponseEntity.ok(payment);
+    public ResponseEntity<Map<String, Object>> refundPayment(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        String reason = body.get("reason") == null ? "" : String.valueOf(body.get("reason"));
+        // amount optional
+        Object amountObj = body.get("amount");
+        BigDecimal amount = null;
+        if (amountObj instanceof Number) {
+            amount = BigDecimal.valueOf(((Number) amountObj).doubleValue());
+        }
+        var payment = paymentService.refundPayment(id, reason);
+        Map<String, Object> resp = Map.of(
+                "paymentId", payment.getId(),
+                "status", payment.getStatus(),
+                "message", "REFUND_PROCESSED"
+        );
+        return ResponseEntity.ok(resp);
     }
     
     @DeleteMapping("/{id}")

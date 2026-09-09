@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -12,11 +13,11 @@ import java.math.BigDecimal;
 public class OrderDTO {
     private Long id;
     private Long customerId;
-    private Long productId;
-    private Integer quantity;
+    private List<OrderItemDTO> items;
     private String status;
+    private BigDecimal subtotal;
+    private BigDecimal tax;
     private BigDecimal totalAmount;
-    private String paymentMethod;
     private Long paymentId;
     private String paymentStatus;
     private Long createdAt;

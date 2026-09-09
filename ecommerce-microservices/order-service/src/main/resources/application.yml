@@ -20,6 +20,13 @@ spring:
 server:
   port: 8081
 
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 2000
+        readTimeout: 5000
+
 eureka:
   client:
     serviceUrl:
