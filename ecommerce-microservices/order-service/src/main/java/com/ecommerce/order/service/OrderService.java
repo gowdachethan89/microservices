@@ -140,6 +140,7 @@ public class OrderService {
                 }
                 savedOrder.setStatus("FAILED");
                 savedOrder.setPaymentStatus(paymentResp != null ? paymentResp.getStatus() : "FAILED");
+                savedOrder.setPaymentId(paymentResp != null ? paymentResp.getId() : null);
                 orderRepository.save(savedOrder);
                 throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "PAYMENT_FAILED");
             }
@@ -156,6 +157,7 @@ public class OrderService {
             }
             savedOrder.setStatus("FAILED");
             savedOrder.setPaymentStatus("FAILED");
+            savedOrder.setPaymentId(null);
             orderRepository.save(savedOrder);
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "PAYMENT_FAILED");
         }
@@ -163,6 +165,7 @@ public class OrderService {
         // Step 6: finalize order
         savedOrder.setStatus("CONFIRMED");
         savedOrder.setPaymentStatus("COMPLETED");
+        savedOrder.setPaymentId(paymentResp.getId());
         orderRepository.save(savedOrder);
 
         return mapToDTO(savedOrder);
