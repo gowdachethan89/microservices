@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -22,50 +23,50 @@ public class OrderController {
         OrderDTO created = orderService.createOrder(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
-    
+
+    @PostMapping("/{orderId}/cancel")
+    public ResponseEntity<OrderDTO> cancelOrder(@PathVariable Long orderId,
+                                                @RequestBody Map<String, String> body) {
+        String reason = body != null && body.get("reason") != null ? body.get("reason") : "Customer request";
+        OrderDTO cancelled = orderService.cancelOrder(orderId, reason);
+        return ResponseEntity.ok(cancelled);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<OrderDTO> getOrder(@PathVariable Long id) {
-        OrderDTO order = orderService.getOrderById(id);
-        return ResponseEntity.ok(order);
+        return ResponseEntity.ok(orderService.getOrderById(id));
     }
-    
+
     @GetMapping
     public ResponseEntity<List<OrderDTO>> getAllOrders() {
-        List<OrderDTO> orders = orderService.getAllOrders();
-        return ResponseEntity.ok(orders);
+        return ResponseEntity.ok(orderService.getAllOrders());
     }
-    
+
     @GetMapping("/customer/{customerId}")
     public ResponseEntity<List<OrderDTO>> getOrdersByCustomer(@PathVariable Long customerId) {
-        List<OrderDTO> orders = orderService.getOrdersByCustomerId(customerId);
-        return ResponseEntity.ok(orders);
+        return ResponseEntity.ok(orderService.getOrdersByCustomerId(customerId));
     }
-    
+
     @GetMapping("/status/{status}")
     public ResponseEntity<List<OrderDTO>> getOrdersByStatus(@PathVariable String status) {
-        List<OrderDTO> orders = orderService.getOrdersByStatus(status);
-        return ResponseEntity.ok(orders);
+        return ResponseEntity.ok(orderService.getOrdersByStatus(status));
     }
-    
+
     @PutMapping("/{id}/status")
     public ResponseEntity<OrderDTO> updateOrderStatus(@PathVariable Long id, @RequestParam String status) {
-        OrderDTO updated = orderService.updateOrderStatus(id, status);
-        return ResponseEntity.ok(updated);
+        return ResponseEntity.ok(orderService.updateOrderStatus(id, status));
     }
-    
+
     @PutMapping("/{id}/payment")
-    public ResponseEntity<OrderDTO> updatePaymentInfo(@PathVariable Long id, 
-                                                       @RequestParam Long paymentId, 
-                                                       @RequestParam String paymentStatus) {
-        OrderDTO updated = orderService.updatePaymentInfo(id, paymentId, paymentStatus);
-        return ResponseEntity.ok(updated);
+    public ResponseEntity<OrderDTO> updatePaymentInfo(@PathVariable Long id,
+                                                      @RequestParam Long paymentId,
+                                                      @RequestParam String paymentStatus) {
+        return ResponseEntity.ok(orderService.updatePaymentInfo(id, paymentId, paymentStatus));
     }
-    
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteOrder(@PathVariable Long id) {
         orderService.deleteOrder(id);
         return ResponseEntity.noContent().build();
     }
-    
 }
-

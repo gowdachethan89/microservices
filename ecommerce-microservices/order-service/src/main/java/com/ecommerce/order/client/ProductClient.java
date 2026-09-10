@@ -2,10 +2,9 @@ package com.ecommerce.order.client;
 
 import com.ecommerce.order.client.dto.ProductDTO;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @FeignClient(name = "product-service", url = "${product.service.url}", path = "/api/products")
 public interface ProductClient {
@@ -14,12 +13,11 @@ public interface ProductClient {
     ProductDTO getProduct(@PathVariable("id") Long id);
 
     @PutMapping("/{id}/inventory/reserve")
-    void reserveInventory(@PathVariable("id") Long id, @RequestBody java.util.Map<String, Object> body);
+    void reserveInventory(@PathVariable("id") Long id, @RequestBody Map<String, Object> body);
 
     @PutMapping("/{id}/inventory/release")
-    void releaseInventory(@PathVariable("id") Long id, @RequestBody java.util.Map<String, Object> body);
+    void releaseInventory(@PathVariable("id") Long id, @RequestBody Map<String, Object> body);
 
     @PutMapping("/{id}/inventory/commit")
-    void commitInventory(@PathVariable("id") Long id, @RequestBody java.util.Map<String, Object> body);
-
+    void commitInventory(@PathVariable("id") Long id, @RequestBody Map<String, Object> body);
 }

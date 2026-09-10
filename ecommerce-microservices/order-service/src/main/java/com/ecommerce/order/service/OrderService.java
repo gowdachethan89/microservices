@@ -6,6 +6,7 @@ import com.ecommerce.order.client.ProductClient;
 import com.ecommerce.order.client.dto.CustomerDTO;
 import com.ecommerce.order.client.dto.PaymentDTO;
 import com.ecommerce.order.client.dto.ProductDTO;
+import com.ecommerce.order.client.dto.RefundRequest;
 import com.ecommerce.order.dto.*;
 import com.ecommerce.order.entity.Order;
 import com.ecommerce.order.entity.OrderItem;
@@ -262,8 +263,75 @@ public class OrderService {
         log.info("Order deleted with ID: {}", id);
     }
 
+    public OrderDTO cancelOrder(Long orderId, String reason) {
+        log.info("Cancelling order {} with reason: {}", orderId, reason);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+
+        String currentStatus = order.getStatus() == null ? "" : order.getStatus().trim().toUpperCase(Locale.ROOT);
+
+        if ("CANCELLED".equals(currentStatus)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "ORDER_ALREADY_CANCELLED");
+        }
+        if ("SHIPPED".equals(currentStatus) || "DELIVERED".equals(currentStatus)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ORDER_CANNOT_BE_CANCELLED");
+        }
+        if (!"PENDING".equals(currentStatus) && !"CONFIRMED".equals(currentStatus)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_ORDER_STATE_FOR_CANCELLATION");
+        }
+
+        if (order.getPaymentId() != null) {
+            try {
+                PaymentDTO refund = paymentClient.refundPayment(
+                        order.getPaymentId(),
+                        new RefundRequest(
+                                reason != null ? reason : "Customer request",
+                                order.getTotalAmount()
+                        )
+                );
+                log.info("Refund processed for order {} paymentId {}: {}", orderId, order.getPaymentId(), refund.getStatus());
+            } catch (Exception ex) {
+                log.error("Refund failed for order {} paymentId {}: {}", orderId, order.getPaymentId(), ex.getMessage());
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "REFUND_PROCESSING_FAILED");
+            }
+        }
+
+        for (OrderItem item : order.getItems()) {
+            Map<String, Object> body = Map.of(
+                    "quantity", item.getQuantity(),
+                    "orderId", orderId,
+                    "reason", "ORDER_CANCELLED"
+            );
+            try {
+                productClient.releaseInventory(item.getProductId(), body);
+            } catch (Exception ex) {
+                log.error("Failed to release inventory for product {} during cancellation of order {}: {}",
+                        item.getProductId(), orderId, ex.getMessage());
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "INVENTORY_RELEASE_FAILED");
+            }
+        }
+
+        order.setStatus("CANCELLED");
+        order.setPaymentStatus("REFUNDED");
+        order.setCancellationReason(reason != null ? reason : "Customer request");
+        Order updatedOrder = orderRepository.save(order);
+
+        log.info("Order {} cancelled successfully", orderId);
+        return mapToDTO(updatedOrder);
+    }
+
     private OrderDTO mapToDTO(Order order) {
-        var items = order.getItems().stream().map(it -> new OrderItemDTO(it.getProductId(), it.getProductName(), it.getQuantity(), it.getUnitPrice(), it.getSubtotal())).collect(Collectors.toList());
+        var items = order.getItems().stream()
+                .map(it -> new OrderItemDTO(
+                        it.getProductId(),
+                        it.getProductName(),
+                        it.getQuantity(),
+                        it.getUnitPrice(),
+                        it.getSubtotal()
+                ))
+                .collect(Collectors.toList());
+
         return new OrderDTO(
                 order.getId(),
                 order.getCustomerId(),
@@ -274,6 +342,7 @@ public class OrderService {
                 order.getTotalAmount(),
                 order.getPaymentId(),
                 order.getPaymentStatus(),
+                order.getCancellationReason(),
                 order.getCreatedAt(),
                 order.getUpdatedAt()
         );

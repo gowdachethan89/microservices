@@ -20,7 +20,7 @@ public class OrderDTO {
     private BigDecimal totalAmount;
     private Long paymentId;
     private String paymentStatus;
+    private String cancellationReason;
     private Long createdAt;
     private Long updatedAt;
 }
-

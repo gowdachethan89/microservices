@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -127,18 +128,23 @@ public class PaymentService {
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
-    
-    public PaymentDTO refundPayment(Long id, String reason) {
-        log.info("Processing refund for payment: {}", id);
+
+    public PaymentDTO refundPayment(Long id, String reason, BigDecimal amount) {
+        log.info("Processing refund for payment: {} reason={} amount={}", id, reason, amount);
+
         Payment payment = paymentRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Payment not found with ID: " + id));
-        
-        if (!"COMPLETED".equals(payment.getStatus())) {
+
+        if (!"COMPLETED".equalsIgnoreCase(payment.getStatus())) {
             throw new RuntimeException("Only completed payments can be refunded");
         }
-        
+
         payment.setStatus("REFUNDED");
         payment.setFailureReason(reason);
+        if (amount != null && amount.compareTo(BigDecimal.ZERO) > 0) {
+            payment.setAmount(amount);
+        }
+
         Payment refundedPayment = paymentRepository.save(payment);
         log.info("Payment refunded: {}", refundedPayment.getId());
         return mapToDTO(refundedPayment);
