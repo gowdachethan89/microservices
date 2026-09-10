@@ -24,4 +24,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("UPDATE Product p SET p.reserved = p.reserved - :qty, p.available = p.available + :qty WHERE p.id = :id AND p.reserved >= :qty")
     int releaseReservedInventory(@Param("id") Long id, @Param("qty") Integer qty);
 
+    // Commit reserved stock to actual warehouse depletion when order is completed/delivered.
+    @Modifying
+    @Query("UPDATE Product p SET p.quantity = p.quantity - :qty, p.reserved = p.reserved - :qty WHERE p.id = :id AND p.reserved >= :qty")
+    int commitInventory(@Param("id") Long id, @Param("qty") Integer qty);
+
 }

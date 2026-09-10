@@ -91,6 +91,18 @@ public class ProductController {
         }
         return ResponseEntity.ok(Map.of("status", "RELEASED"));
     }
+
+    @PutMapping("/{id}/inventory/commit")
+    public ResponseEntity<Map<String, Object>> commitInventory(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Integer quantity = body.get("quantity") == null ? 0 : ((Number) body.get("quantity")).intValue();
+        String orderId = body.get("orderId") == null ? null : String.valueOf(body.get("orderId"));
+        String reason = body.get("reason") == null ? null : String.valueOf(body.get("reason"));
+        boolean committed = productService.commitInventory(id, quantity, orderId, reason);
+        if (!committed) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "INSUFFICIENT_RESERVED_STOCK"));
+        }
+        return ResponseEntity.ok(Map.of("status", "COMMITTED"));
+    }
     
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {

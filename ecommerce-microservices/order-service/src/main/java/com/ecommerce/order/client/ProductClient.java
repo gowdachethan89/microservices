@@ -19,4 +19,7 @@ public interface ProductClient {
     @PutMapping("/{id}/inventory/release")
     void releaseInventory(@PathVariable("id") Long id, @RequestBody java.util.Map<String, Object> body);
 
+    @PutMapping("/{id}/inventory/commit")
+    void commitInventory(@PathVariable("id") Long id, @RequestBody java.util.Map<String, Object> body);
+
 }

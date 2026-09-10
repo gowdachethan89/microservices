@@ -53,6 +53,17 @@ public class ProductService {
         int updated = productRepository.releaseReservedInventory(productId, quantity);
         return updated > 0;
     }
+
+    // Final commit: deduct from quantity and reserved when order is completed/delivered.
+    @Transactional
+    public boolean commitInventory(Long productId, Integer quantity, String orderId, String reason) {
+        log.info("Committing {} units for product: {} (order={} reason={})", quantity, productId, orderId, reason);
+        if (quantity == null || quantity <= 0) {
+            return false;
+        }
+        int updated = productRepository.commitInventory(productId, quantity);
+        return updated > 0;
+    }
     
     public ProductDTO getProductById(Long id) {
         log.info("Fetching product with ID: {}", id);

@@ -121,7 +121,6 @@ public class OrderService {
         PaymentDTO paymentReq = new PaymentDTO();
         paymentReq.setOrderId(savedOrder.getId());
         paymentReq.setAmount(total);
-        paymentReq.setStatus("COMPLETED");
         paymentReq.setPaymentMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "CARD");
 
         PaymentDTO paymentResp;
@@ -207,7 +206,36 @@ public class OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
 
-        order.setStatus(status);
+        String targetStatus = status == null ? "" : status.trim().toUpperCase(Locale.ROOT);
+        String previousStatus = order.getStatus() == null ? "" : order.getStatus().trim().toUpperCase(Locale.ROOT);
+
+        if (("COMPLETED".equals(targetStatus) || "DELIVERED".equals(targetStatus))
+                && ("COMPLETED".equals(previousStatus) || "DELIVERED".equals(previousStatus))) {
+            log.info("Order {} already in terminal status {}. Skipping inventory commit.", id, previousStatus);
+            return mapToDTO(order);
+        }
+
+        if ("COMPLETED".equals(targetStatus) || "DELIVERED".equals(targetStatus)) {
+            for (OrderItem item : order.getItems()) {
+                Map<String, Object> body = Map.of(
+                        "quantity", item.getQuantity(),
+                        "orderId", order.getId(),
+                        "reason", "ORDER_" + targetStatus
+                );
+                try {
+                    productClient.commitInventory(item.getProductId(), body);
+                } catch (Exception ex) {
+                    log.error("Failed to commit inventory for product {} in order {}: {}", item.getProductId(), id, ex.getMessage());
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "INVENTORY_COMMIT_FAILED");
+                }
+            }
+        }
+
+        order.setStatus(targetStatus);
+        if ("COMPLETED".equals(targetStatus) || "DELIVERED".equals(targetStatus)) {
+            order.setPaymentStatus("COMPLETED");
+        }
+
         Order updatedOrder = orderRepository.save(order);
         log.info("Order {} status updated", updatedOrder.getId());
         return mapToDTO(updatedOrder);
