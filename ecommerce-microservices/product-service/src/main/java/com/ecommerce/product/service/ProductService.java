@@ -2,6 +2,7 @@ package com.ecommerce.product.service;
 
 import com.ecommerce.product.dto.ProductDTO;
 import com.ecommerce.product.entity.Product;
+import com.ecommerce.product.exception.BadRequestException;
 import com.ecommerce.product.exception.ResourceNotFoundException;
 import com.ecommerce.product.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -133,6 +134,26 @@ public class ProductService {
         }
         productRepository.deleteById(id);
         log.info("Product deleted with ID: {}", id);
+    }
+
+    // Add imports if not already present:
+    // import com.ecommerce.product.exception.BadRequestException;
+    @Transactional
+    public ProductDTO restockInventory(Long productId, Integer quantity, String reason) {
+        log.info("Restocking {} units for product {} (reason={})", quantity, productId, reason);
+        if (quantity == null || quantity <= 0) {
+            throw new BadRequestException("INVALID_RESTOCK_QUANTITY");
+        }
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + productId));
+
+        product.setQuantity(product.getQuantity() + quantity);
+        // ensure available is consistent; PreUpdate will also recalc, but set now for clarity
+        product.setAvailable(product.getQuantity() - (product.getReserved() == null ? 0 : product.getReserved()));
+        Product saved = productRepository.save(product);
+        log.info("Product {} restocked. new quantity={}, reserved={}, available={}", saved.getId(), saved.getQuantity(), saved.getReserved(), saved.getAvailable());
+        return mapToDTO(saved);
     }
     
     private ProductDTO mapToDTO(Product product) {

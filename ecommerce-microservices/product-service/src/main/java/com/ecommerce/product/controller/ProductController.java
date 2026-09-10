@@ -103,7 +103,15 @@ public class ProductController {
         }
         return ResponseEntity.ok(Map.of("status", "COMMITTED"));
     }
-    
+
+    @PutMapping("/{id}/inventory/restock")
+    public ResponseEntity<ProductDTO> restockInventory(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Integer quantity = body.get("quantity") == null ? 0 : ((Number) body.get("quantity")).intValue();
+        String reason = body.get("reason") == null ? "RESTOCK" : String.valueOf(body.get("reason"));
+        ProductDTO updated = productService.restockInventory(id, quantity, reason);
+        return ResponseEntity.ok(updated);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
         log.info("DELETE request for product with ID: {}", id);
