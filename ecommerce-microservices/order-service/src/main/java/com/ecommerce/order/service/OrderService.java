@@ -121,6 +121,7 @@ public class OrderService {
         PaymentDTO paymentReq = new PaymentDTO();
         paymentReq.setOrderId(savedOrder.getId());
         paymentReq.setAmount(total);
+        paymentReq.setStatus("COMPLETED");
         paymentReq.setPaymentMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "CARD");
 
         PaymentDTO paymentResp;

@@ -30,11 +30,49 @@ public class PaymentService {
                 return mapToDTO(existing.get());
             }
         }
-        // If a payment already exists for this orderId, return it (protect against duplicates)
+        // If a payment already exists for this orderId, handle it based on status and idempotency.
         var byOrder = paymentRepository.findByOrderId(dto.getOrderId());
         if (byOrder.isPresent()) {
-            log.info("Existing payment found for orderId={}", dto.getOrderId());
-            return mapToDTO(byOrder.get());
+            Payment existingPayment = byOrder.get();
+            log.info("Existing payment found for orderId={} with status={}", dto.getOrderId(), existingPayment.getStatus());
+
+            // If idempotency key matches an existing record, return it (true idempotency)
+            if (idempotencyKey != null && !idempotencyKey.isBlank()
+                    && idempotencyKey.equals(existingPayment.getIdempotencyKey())) {
+                log.info("Returning existing payment for idempotencyKey={}", idempotencyKey);
+                return mapToDTO(existingPayment);
+            }
+
+            // If the existing payment is already completed or refunded, return it to avoid duplicate processing
+            String status = existingPayment.getStatus();
+            if (status != null && (status.equals("COMPLETED") || status.equals("REFUNDED"))) {
+                log.info("Payment already in terminal state ({}). Returning existing.", status);
+                return mapToDTO(existingPayment);
+            }
+
+            // Otherwise (e.g., PENDING or FAILED), attempt to process/update the existing payment instead of creating a new one.
+            log.info("Attempting to process existing payment record for order {} (currentStatus={})", dto.getOrderId(), status);
+            existingPayment.setPaymentMethod(dto.getPaymentMethod());
+            existingPayment.setAmount(dto.getAmount());
+            // attach idempotency key if provided
+            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+                existingPayment.setIdempotencyKey(idempotencyKey);
+            }
+
+            boolean paymentSuccessExisting = simulatePaymentProcessing();
+            if (paymentSuccessExisting) {
+                existingPayment.setStatus("COMPLETED");
+                existingPayment.setTransactionId(existingPayment.getTransactionId() == null ? generateTransactionId() : existingPayment.getTransactionId());
+                existingPayment.setFailureReason(null);
+                log.info("Existing payment processed successfully for order: {}", dto.getOrderId());
+            } else {
+                existingPayment.setStatus("FAILED");
+                existingPayment.setFailureReason("Payment declined");
+                log.warn("Existing payment failed for order: {}", dto.getOrderId());
+            }
+
+            Payment updated = paymentRepository.save(existingPayment);
+            return mapToDTO(updated);
         }
 
         Payment  payment = new Payment();
@@ -116,8 +154,8 @@ public class PaymentService {
     }
     
     private boolean simulatePaymentProcessing() {
-        // Simulate 90% success rate
-        return Math.random() < 0.9;
+        // Force all mock payments to succeed for local demo flows.
+        return true;
     }
     
     private String generateTransactionId() {

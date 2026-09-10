@@ -26,23 +26,16 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
         if ("COMPLETED".equals(payment.getStatus())) {
-            Map<String, Object> body = Map.of(
-                    "paymentId", payment.getId(),
-                    "orderId", payment.getOrderId(),
-                    "amount", payment.getAmount(),
-                    "status", "COMPLETED",
-                    "transactionId", payment.getTransactionId()
-            );
-            return ResponseEntity.ok(body);
-        } else {
-            Map<String, Object> err = Map.of(
-                    "paymentId", payment.getId(),
-                    "status", "FAILED",
-                    "error", "CARD_DECLINED",
-                    "message", payment.getFailureReason() != null ? payment.getFailureReason() : "Payment failed"
-            );
-            return ResponseEntity.status(402).body(err);
+            return ResponseEntity.ok(payment);
         }
+
+        Map<String, Object> err = Map.of(
+                "paymentId", payment.getId(),
+                "status", "FAILED",
+                "error", "CARD_DECLINED",
+                "message", payment.getFailureReason() != null ? payment.getFailureReason() : "Payment failed"
+        );
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(err);
     }
     
     @GetMapping("/{id}")
