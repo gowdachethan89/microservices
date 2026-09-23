@@ -51,7 +51,7 @@ public class Order {
         this.createdAt = System.currentTimeMillis();
         this.updatedAt = System.currentTimeMillis();
         if (this.status == null || this.status.isBlank()) {
-            this.status = "PENDING";
+            this.status = OrderStatus.CREATED.name();
         }
     }
 

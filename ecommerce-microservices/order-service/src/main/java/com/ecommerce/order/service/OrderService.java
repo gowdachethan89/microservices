@@ -10,6 +10,8 @@ import com.ecommerce.order.client.dto.RefundRequest;
 import com.ecommerce.order.dto.*;
 import com.ecommerce.order.entity.Order;
 import com.ecommerce.order.entity.OrderItem;
+import com.ecommerce.order.entity.OrderStatus;
+import com.ecommerce.order.exception.InvalidOrderStateTransitionException;
 import com.ecommerce.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -108,7 +110,7 @@ public class OrderService {
         // Step 4: Persist PENDING order first
         Order order = new Order();
         order.setCustomerId(request.getCustomerId());
-        order.setStatus("PENDING");
+        order.setStatus(OrderStatus.CREATED.name());
         order.setSubtotal(subtotal);
         order.setTax(tax);
         order.setTotalAmount(total);
@@ -116,7 +118,9 @@ public class OrderService {
         for (OrderItem oi : orderItems) order.addItem(oi);
 
         Order savedOrder = orderRepository.save(order);
-        log.info("Order created (PENDING) id={}", savedOrder.getId());
+        log.info("Order created (CREATED) id={}", savedOrder.getId());
+        savedOrder.setStatus(OrderStatus.PENDING.name());
+        orderRepository.save(savedOrder);
 
         // Step 5: Process payment
         PaymentDTO paymentReq = new PaymentDTO();
@@ -164,7 +168,7 @@ public class OrderService {
         }
 
         // Step 6: finalize order
-        savedOrder.setStatus("CONFIRMED");
+        savedOrder.setStatus(OrderStatus.CONFIRMED.name());
         savedOrder.setPaymentStatus("COMPLETED");
         savedOrder.setPaymentId(paymentResp.getId());
         orderRepository.save(savedOrder);
@@ -197,66 +201,57 @@ public class OrderService {
 
     public List<OrderDTO> getOrdersByStatus(String status) {
         log.info("Fetching orders with status: {}", status);
-        return orderRepository.findByStatus(status)
+        OrderStatus enumStatus = OrderStatus.fromValue(status);
+        if (enumStatus == null) {
+            return Collections.emptyList();
+        }
+        return orderRepository.findByStatus(enumStatus.name())
                 .stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
 
-    public OrderDTO updateOrderStatus(Long id, String status) {
-        log.info("Updating order {} status to: {}", id, status);
-        Order order = orderRepository.findById(id)
+    public OrderDTO updateOrderStatus(Long orderId, OrderStatus newStatus) {
+        log.info("Updating order {} status to: {}", orderId, newStatus);
+        Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
 
-        String targetStatus = status == null ? "" : status.trim().toUpperCase(Locale.ROOT);
-        String previousStatus = order.getStatus() == null ? "" : order.getStatus().trim().toUpperCase(Locale.ROOT);
-
-        if (("COMPLETED".equals(targetStatus) || "DELIVERED".equals(targetStatus))
-                && ("COMPLETED".equals(previousStatus) || "DELIVERED".equals(previousStatus))) {
-            log.info("Order {} already in terminal status {}. Skipping inventory commit.", id, previousStatus);
+        OrderStatus currentStatus = OrderStatus.fromValue(order.getStatus());
+        if (currentStatus == null) {
+            currentStatus = OrderStatus.CREATED;
+        }
+        if (newStatus == null) {
+            throw new IllegalArgumentException("Order status cannot be null");
+        }
+        if (currentStatus == newStatus) {
+            log.info("Order {} already in status {}. No-op.", orderId, newStatus);
             return mapToDTO(order);
         }
-
-        if ("COMPLETED".equals(targetStatus) || "DELIVERED".equals(targetStatus)) {
-            for (OrderItem item : order.getItems()) {
-                Map<String, Object> body = Map.of(
-                        "quantity", item.getQuantity(),
-                        "orderId", order.getId(),
-                        "reason", "ORDER_" + targetStatus
-                );
-                try {
-                    productClient.commitInventory(item.getProductId(), body);
-                } catch (Exception ex) {
-                    log.error("Failed to commit inventory for product {} in order {}: {}", item.getProductId(), id, ex.getMessage());
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "INVENTORY_COMMIT_FAILED");
-                }
-            }
+        if (!currentStatus.canTransitionTo(newStatus)) {
+            throw new InvalidOrderStateTransitionException(currentStatus, newStatus);
         }
 
-        if ("CANCELLED".equals(targetStatus)) {
-            for (OrderItem item : order.getItems()) {
-                Map<String, Object> body = Map.of(
-                        "quantity", item.getQuantity(),
-                        "orderId", order.getId(),
-                        "reason", "ORDER_" + targetStatus
-                );
-                try {
-                    productClient.releaseInventory(item.getProductId(), body);
-                } catch (Exception ex) {
-                    log.error("Failed to release inventory for product {} in order {}: {}", item.getProductId(), id, ex.getMessage());
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "INVENTORY_RELEASE_FAILED");
-                }
-            }
-        }
+        order.setStatus(newStatus.name());
 
-        order.setStatus(targetStatus);
-        if ("COMPLETED".equals(targetStatus) || "DELIVERED".equals(targetStatus)) {
-            order.setPaymentStatus("COMPLETED");
+        if(newStatus.equals(OrderStatus.CANCELLED)) {
+            cancelOrder(orderId, "Order cancelled by user");
+            order.setCancellationReason("Order cancelled by user");
         }
-
+        if(newStatus.equals(OrderStatus.DELIVERED)) {
+            deliverOrder(orderId);
+            order.setCancellationReason("Order delivered to user");
+        }
         Order updatedOrder = orderRepository.save(order);
-        log.info("Order {} status updated", updatedOrder.getId());
+        log.info("Order {} status updated to {}", updatedOrder.getId(), newStatus);
         return mapToDTO(updatedOrder);
+    }
+
+    public OrderDTO updateOrderStatus(Long id, String status) {
+        OrderStatus newStatus = OrderStatus.fromValue(status);
+        if (newStatus == null) {
+            throw new IllegalArgumentException("Unsupported order status: " + status);
+        }
+        return updateOrderStatus(id, newStatus);
     }
 
     public OrderDTO updatePaymentInfo(Long id, Long paymentId, String paymentStatus) {
@@ -345,6 +340,40 @@ public class OrderService {
 
         log.info("Order {} cancelled successfully", orderId);
         return mapToDTO(updatedOrder);
+    }
+
+    public void deliverOrder(Long orderId) {
+        log.info("Delivering order {}", orderId);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Order not found"));
+
+        String currentStatus = order.getStatus() == null ? "" : order.getStatus().trim().toUpperCase(Locale.ROOT);
+
+        // Check if order is in a valid state for delivery (CONFIRMED or SHIPPED)
+        if (!"DELIVERED".equals(currentStatus)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_ORDER_STATE_FOR_DELIVERY");
+        }
+
+        // Release reserved inventory for all items in the order as they are now delivered
+        for (OrderItem item : order.getItems()) {
+            Map<String, Object> body = Map.of(
+                    "quantity", item.getQuantity(),
+                    "orderId", orderId,
+                    "reason", "ORDER_DELIVERED"
+            );
+            try {
+                // Commit the inventory as the order is being fulfilled/delivered
+                productClient.commitInventory(item.getProductId(), body);
+                log.info("Inventory committed for product {} quantity {} during delivery", item.getProductId(), item.getQuantity());
+            } catch (Exception ex) {
+                log.error("Failed to commit inventory for product {} during delivery of order {}: {}",
+                        item.getProductId(), orderId, ex.getMessage());
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "INVENTORY_COMMIT_FAILED");
+            }
+        }
+
+        log.info("Order {} delivered successfully", orderId);
     }
 
     private OrderDTO mapToDTO(Order order) {
