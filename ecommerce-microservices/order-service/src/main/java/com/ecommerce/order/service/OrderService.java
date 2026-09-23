@@ -233,6 +233,22 @@ public class OrderService {
             }
         }
 
+        if ("CANCELLED".equals(targetStatus)) {
+            for (OrderItem item : order.getItems()) {
+                Map<String, Object> body = Map.of(
+                        "quantity", item.getQuantity(),
+                        "orderId", order.getId(),
+                        "reason", "ORDER_" + targetStatus
+                );
+                try {
+                    productClient.releaseInventory(item.getProductId(), body);
+                } catch (Exception ex) {
+                    log.error("Failed to release inventory for product {} in order {}: {}", item.getProductId(), id, ex.getMessage());
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "INVENTORY_RELEASE_FAILED");
+                }
+            }
+        }
+
         order.setStatus(targetStatus);
         if ("COMPLETED".equals(targetStatus) || "DELIVERED".equals(targetStatus)) {
             order.setPaymentStatus("COMPLETED");
@@ -275,10 +291,11 @@ public class OrderService {
         if ("CANCELLED".equals(currentStatus)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "ORDER_ALREADY_CANCELLED");
         }
-        if ("SHIPPED".equals(currentStatus) || "DELIVERED".equals(currentStatus)) {
+        if ("SHIPPED".equals(currentStatus)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ORDER_CANNOT_BE_CANCELLED");
         }
-        if (!"PENDING".equals(currentStatus) && !"CONFIRMED".equals(currentStatus)) {
+        // allow cancellation for PENDING, CONFIRMED, COMPLETED, DELIVERED (we will branch for inventory handling)
+        if (!List.of("PENDING","CONFIRMED","COMPLETED","DELIVERED").contains(currentStatus)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_ORDER_STATE_FOR_CANCELLATION");
         }
 
@@ -298,6 +315,8 @@ public class OrderService {
             }
         }
 
+        boolean wasCommitted = "COMPLETED".equals(currentStatus) || "DELIVERED".equals(currentStatus);
+
         for (OrderItem item : order.getItems()) {
             Map<String, Object> body = Map.of(
                     "quantity", item.getQuantity(),
@@ -305,11 +324,17 @@ public class OrderService {
                     "reason", "ORDER_CANCELLED"
             );
             try {
-                productClient.releaseInventory(item.getProductId(), body);
+                if (wasCommitted) {
+                    // stock already deducted; restock the physical quantity
+                    productClient.restockInventory(item.getProductId(), body);
+                } else {
+                    // only reserved, release it
+                    productClient.releaseInventory(item.getProductId(), body);
+                }
             } catch (Exception ex) {
-                log.error("Failed to release inventory for product {} during cancellation of order {}: {}",
+                log.error("Failed to adjust inventory for product {} during cancellation of order {}: {}",
                         item.getProductId(), orderId, ex.getMessage());
-                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "INVENTORY_RELEASE_FAILED");
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "INVENTORY_ADJUSTMENT_FAILED");
             }
         }
 
