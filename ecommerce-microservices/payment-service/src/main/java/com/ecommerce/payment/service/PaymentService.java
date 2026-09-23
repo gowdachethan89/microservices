@@ -23,6 +23,13 @@ public class PaymentService {
     // Support idempotent processing by idempotencyKey and by orderId
     public PaymentDTO processPayment(PaymentDTO dto, String idempotencyKey) {
         log.info("Processing payment for order: {} (idempotencyKey={})", dto.getOrderId(), idempotencyKey);
+        // Validate required fields
+        if (dto == null || dto.getOrderId() == null) {
+            throw new IllegalArgumentException("orderId is required");
+        }
+        if (dto.getCustomerId() == null) {
+            throw new IllegalArgumentException("customerId is required");
+        }
         // If idempotency key provided, return existing if present
         if (idempotencyKey != null && !idempotencyKey.isBlank()) {
             var existing = paymentRepository.findByIdempotencyKey(idempotencyKey);
@@ -78,6 +85,7 @@ public class PaymentService {
 
         Payment  payment = new Payment();
         payment.setOrderId(dto.getOrderId());
+        payment.setCustomerId(dto.getCustomerId());
         payment.setAmount(dto.getAmount());
         payment.setPaymentMethod(dto.getPaymentMethod());
         payment.setTransactionId(generateTransactionId());
@@ -149,6 +157,42 @@ public class PaymentService {
         log.info("Payment refunded: {}", refundedPayment.getId());
         return mapToDTO(refundedPayment);
     }
+
+    public PaymentDTO updatePayment(Long id, PaymentDTO dto) {
+        log.info("Updating payment {} with payload: {}", id, dto);
+        Payment payment = paymentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Payment not found with ID: " + id));
+
+        // Ensure customerId is present either in payload or already on record
+        if (dto.getCustomerId() != null) {
+            payment.setCustomerId(dto.getCustomerId());
+        } else if (payment.getCustomerId() == null) {
+            throw new IllegalArgumentException("customerId is required to update payment");
+        }
+
+        if (dto.getOrderId() != null) {
+            payment.setOrderId(dto.getOrderId());
+        }
+        if (dto.getAmount() != null) {
+            payment.setAmount(dto.getAmount());
+        }
+        if (dto.getStatus() != null && !dto.getStatus().isBlank()) {
+            payment.setStatus(dto.getStatus());
+        }
+        if (dto.getPaymentMethod() != null && !dto.getPaymentMethod().isBlank()) {
+            payment.setPaymentMethod(dto.getPaymentMethod());
+        }
+        if (dto.getTransactionId() != null && !dto.getTransactionId().isBlank()) {
+            payment.setTransactionId(dto.getTransactionId());
+        }
+        if (dto.getFailureReason() != null) {
+            payment.setFailureReason(dto.getFailureReason());
+        }
+
+        Payment updated = paymentRepository.save(payment);
+        log.info("Payment {} updated successfully", updated.getId());
+        return mapToDTO(updated);
+    }
     
     public void deletePayment(Long id) {
         log.info("Deleting payment with ID: {}", id);
@@ -172,6 +216,7 @@ public class PaymentService {
         return new PaymentDTO(
                 payment.getId(),
                 payment.getOrderId(),
+                payment.getCustomerId(),
                 payment.getAmount(),
                 payment.getStatus(),
                 payment.getPaymentMethod(),

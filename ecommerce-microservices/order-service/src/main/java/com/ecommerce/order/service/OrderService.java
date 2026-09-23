@@ -121,6 +121,7 @@ public class OrderService {
         // Step 5: Process payment
         PaymentDTO paymentReq = new PaymentDTO();
         paymentReq.setOrderId(savedOrder.getId());
+        paymentReq.setCustomerId(savedOrder.getCustomerId());
         paymentReq.setAmount(total);
         paymentReq.setPaymentMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "CARD");
 
